@@ -1,11 +1,79 @@
 version: '3.9'
 
 services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - 2181:2181
+    volumes:
+      - ./zookeeper_data:/bitnami
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - local_network
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    ports:
+      - 9092:9092
+    volumes:
+      - ./kafka_data:/bitnami/kafka
+      - ./kafka_log:/tmp/kafka_mounts/logs
+      - ./server.properties:/bitnami/kafka/config/server.properties:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/data
+    depends_on:
+      - zookeeper
+    networks:
+      - local_network
+
+  kafka-connect:
+    image: bitnami/kafka:latest
+    container_name: kafka_connect
+    ports:
+      - 8083:8083
+    volumes:
+      - ./kafka_connect_data:/bitnami/kafka
+      - ./connector_json.properties:/opt/bitnami/kafka/config/connect-standalone.properties
+      - ./data:/data
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - local_network
+    command: /opt/bitnami/kafka/bin/connect-standalone.sh /opt/bitnami/kafka/config/connect-standalone.properties
+
   cassandra:
     image: cassandra:4.0
+    container_name: d_cassandra
     ports:
       - 9042:9042
     volumes:
       - ~/apps/cassandra:/var/lib/cassandra
     environment:
       - CASSANDRA_CLUSTER_NAME=c_cluster
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: d_spark
+    ports:
+      - 4040:4040
+      - 8080:8080
+    volumes:
+      - ./spark/work-dir:/opt/bitnami/spark/work-dir
+      - ./spark/.ivy2:/opt/bitnami/spark/.ivy2
+    environment:
+      SPARK_MASTER_URL: "spark://spark:7077"
+      SPARK_MODE: master
+    depends_on:
+      - zookeeper
+      - kafka
+      - kafka-connect
+    networks:
+      - local_network
+
+networks:
+  local_network:
+    driver: bridge

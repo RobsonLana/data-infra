@@ -1,0 +1,11 @@
+# docker-compose volumes
+data
+kafka_connect_data
+kafka_data
+kafka_log
+spark/.ivy2
+spark/jars
+zookeeper_data
+
+# unrelated files
+.directory
