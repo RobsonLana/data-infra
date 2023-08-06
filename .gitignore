@@ -1,8 +1,10 @@
 # docker-compose volumes
+cassandra
 data
 kafka_connect_data
 kafka_data
 kafka_log
+notebooks/.ipynb_checkpoints
 spark/.ivy2
 spark/jars
 zookeeper_data

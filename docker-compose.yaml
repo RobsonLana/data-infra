@@ -18,6 +18,7 @@ services:
     container_name: kafka
     ports:
       - 9092:9092
+      - 9094:9094
     volumes:
       - ./kafka_data:/bitnami/kafka
       - ./kafka_log:/tmp/kafka_mounts/logs
@@ -26,6 +27,12 @@ services:
       - ./data:/data
     depends_on:
       - zookeeper
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
     networks:
       - local_network
 
@@ -36,13 +43,17 @@ services:
       - 8083:8083
     volumes:
       - ./kafka_connect_data:/bitnami/kafka
-      - ./connector_json.properties:/opt/bitnami/kafka/config/connect-standalone.properties
+      - ./connectors/connector_json.properties:/opt/bitnami/kafka/config/connect-standalone.properties
       - ./data:/data
     depends_on:
       - zookeeper
       - kafka
     networks:
       - local_network
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
+      BOOTSTRAP_SERVER: kafka:9092
     command: /opt/bitnami/kafka/bin/connect-standalone.sh /opt/bitnami/kafka/config/connect-standalone.properties
 
   cassandra:
@@ -51,9 +62,12 @@ services:
     ports:
       - 9042:9042
     volumes:
-      - ~/apps/cassandra:/var/lib/cassandra
+      - ./cassandra:/var/lib/cassandra
+      - ./cassandra/schema.cql:/schema.cql:ro
+      - ./data:/data
     environment:
       - CASSANDRA_CLUSTER_NAME=c_cluster
+    command: ["cassandra", "-f"]
 
   spark:
     image: bitnami/spark:latest
