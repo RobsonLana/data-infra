@@ -1,0 +1,19 @@
+{
+  "name": "bitcoin_chart_source",
+  "config": {
+    "tasks.max": "10",
+    "connector.class": "com.datamountaineer.streamreactor.connect.cassandra.source.CassandraSourceConnector",
+    "connect.cassandra.contact.points": "cassandra",
+    "connect.cassandra.port": 9042,
+    "connect.cassandra.key.space": "bitcoin_chart",
+		"connect.cassandra.import.poll.interval": 1000,
+    "connect.cassandra.retry.interval": 5000,
+    "connect.cassandra.import.mode": "incremental",
+    "connect.cassandra.kcql": "INSERT INTO bitcoin_chart_topic SELECT * FROM raw_1d PK ot INCREMENTALMODE=TIMESTAMP",
+		"topic": "bitcoin_chart_topic",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-register:8081",
+    "value.converter.schema.registry.url": "http://schema-register:8081"
+  }
+}

@@ -9,52 +9,9 @@ services:
     volumes:
       - ./zookeeper_data:/bitnami
     environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
+      ALLOW_ANONYMOUS_LOGIN: yes
     networks:
       - local_network
-
-  kafka:
-    image: bitnami/kafka:latest
-    container_name: kafka
-    ports:
-      - 9092:9092
-      - 9094:9094
-    volumes:
-      - ./kafka_data:/bitnami/kafka
-      - ./kafka_log:/tmp/kafka_mounts/logs
-      - ./server.properties:/bitnami/kafka/config/server.properties:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./data:/data
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
-    networks:
-      - local_network
-
-  kafka-connect:
-    image: bitnami/kafka:latest
-    container_name: kafka_connect
-    ports:
-      - 8083:8083
-    volumes:
-      - ./kafka_connect_data:/bitnami/kafka
-      - ./connectors/connector_json.properties:/opt/bitnami/kafka/config/connect-standalone.properties
-      - ./data:/data
-    depends_on:
-      - zookeeper
-      - kafka
-    networks:
-      - local_network
-    environment:
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
-      BOOTSTRAP_SERVER: kafka:9092
-    command: /opt/bitnami/kafka/bin/connect-standalone.sh /opt/bitnami/kafka/config/connect-standalone.properties
 
   cassandra:
     image: cassandra:4.0
@@ -66,8 +23,83 @@ services:
       - ./cassandra/schema.cql:/schema.cql:ro
       - ./data:/data
     environment:
-      - CASSANDRA_CLUSTER_NAME=c_cluster
+      CASSANDRA_CLUSTER_NAME: c_cluster
+    networks:
+      - local_network
     command: ["cassandra", "-f"]
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - 9092:9092
+    volumes:
+      - ./kafka_data:/var/lib/kafka/data
+      - ./kafka_log:/tmp/kafka_mounts/logs
+      - ./server.properties:/etc/kafka/server.properties:ro
+      - ./data:/data
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181/kafka
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - local_network
+
+  schema-register:
+    image: confluentinc/cp-schema-registry:latest
+    container_name: schema-register
+    ports:
+      - 8081:8081
+    volumes:
+      - ./schema-registry.properties:/etc/schema-registry/config.properties:ro
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - local_network
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181/kafka
+      SCHEMA_REGISTRY_HOST_NAME: schema-register
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN: '*'
+      SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_METHODS: 'GET,POST,PUT,OPTIONS'
+
+  kafka-connect:
+    build:
+      context: ./
+      dockerfile: Dockerfile.kafka
+    image: bitnami/kafka:latest
+    container_name: kafka_connect
+    ports:
+      - 8083:8083
+    volumes:
+      - ./kafka_connect_data:/var/lib/kafka/data
+      - ./connectors:/connectors
+      - ./data:/data
+    depends_on:
+      - zookeeper
+      - kafka
+      - schema-register
+      - cassandra
+    networks:
+      - local_network
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      CONNECT_BOOTSTRAP_SERVER: kafka:9092
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-register:8081'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-register:8081'
+      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-register:8081'
+    command: connect-standalone /connectors/connector.properties
+
 
   spark:
     image: bitnami/spark:latest
@@ -81,10 +113,6 @@ services:
     environment:
       SPARK_MASTER_URL: "spark://spark:7077"
       SPARK_MODE: master
-    depends_on:
-      - zookeeper
-      - kafka
-      - kafka-connect
     networks:
       - local_network
 

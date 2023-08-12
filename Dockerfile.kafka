@@ -1,0 +1,20 @@
+FROM confluentinc/cp-kafka-connect:latest
+
+USER root
+
+# RUN rm -rf /var/lib/apt/lists/* && apt-get clean && apt-get update && apt-get install -y unzip && apt-get clean
+
+RUN mkdir -p /plugins
+
+RUN curl -L https://github.com/lensesio/stream-reactor/releases/download/4.2.0/kafka-connect-cassandra-4.2.0.zip --output /tmp/kafka-connect-cassandra.zip
+
+RUN curl -L https://packages.confluent.io/maven/io/confluent/kafka-connect-avro-converter/6.2.0/kafka-connect-avro-converter-6.2.0.jar --output /plugins/kafka-connect-avro-converter-6.2.0.jar
+
+RUN curl -L https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/7.4.0/kafka-schema-registry-client-6.2.0.jar --output /plugins/kafka-schema-registry-client-6.2.0.jar
+
+WORKDIR /tmp
+
+RUN jar xvf /tmp/kafka-connect-cassandra.zip
+RUN mv /tmp/**/*.jar /plugins/
+
+USER 1001

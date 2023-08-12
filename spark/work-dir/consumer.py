@@ -12,11 +12,13 @@ if __name__ == "__main__":
     kafka_params = {
         "kafka.bootstrap.servers": "kafka:9092",
         "group.id": "k-connect-cluster",
-        "subscribe": "btc-kl",
+        "subscribe": "bitcoin_chart_topic",
         "kafkaConsumer.pollTimeoutsMs": '5000'
     }
 
-    spark = SparkSession.builder.appName("spark_consumer").getOrCreate()
+    spark = SparkSession.builder.appName("spark_kafka_consumer")\
+        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2")\
+        .getOrCreate()
 
     df = spark.readStream.format('kafka').options(**kafka_params).load()
     print(df)
