@@ -100,21 +100,42 @@ services:
       KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-register:8081'
     command: connect-standalone /connectors/connector.properties
 
-
-  spark:
-    image: bitnami/spark:latest
-    container_name: d_spark
+  spark-master:
+    build:
+      context: ./
+      dockerfile: Dockerfile.spark
+    container_name: spark_master
     ports:
-      - 4040:4040
       - 8080:8080
+      - 7077:7077
     volumes:
       - ./spark/work-dir:/opt/bitnami/spark/work-dir
       - ./spark/.ivy2:/opt/bitnami/spark/.ivy2
     environment:
-      SPARK_MASTER_URL: "spark://spark:7077"
+      SPARK_LOCAL_IP: spark-master
       SPARK_MODE: master
     networks:
       - local_network
+
+  spark-worker:
+    build:
+      context: ./
+      dockerfile: Dockerfile.spark
+    container_name: spark_worker
+    ports:
+      - 8084:8081
+    volumes:
+      - ./spark/work-dir:/opt/bitnami/spark/work-dir
+      - ./spark/.ivy2:/opt/bitnami/spark/.ivy2
+    depends_on:
+      - spark-master
+    networks:
+      - local_network
+    environment:
+      SPARK_MASTER: "spark://spark-master:7077"
+      SPARK_WORKER_MEMORY: 1G
+      SPARK_WORKER_CORES: 4
+      SPARK_MODE: worker
 
 networks:
   local_network:
